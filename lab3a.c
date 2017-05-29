@@ -67,7 +67,7 @@ main (int argc, char **argv)
   printSuperblock();
 
   groupBlock = (struct ext2_group_desc *) malloc (BUF_SIZE);
-  pread(fd, groupBlock, BUF_SIZE, BUF_SIZE);
+  pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*2);
   printGroupBlock();
   
   return 0;
