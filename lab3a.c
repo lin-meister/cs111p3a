@@ -41,11 +41,15 @@ void printSuperblock()
 }
 
 void printGroupBlock() {
-
   int blockNum = 0;
-  long long unsigned int totalNumofBlocks =(long long unsigned int) groupBlock-> bg_block_bitmap;
-  fprintf(stdout, "GROUP,%d,%llu\n",blockNum,totalNumofBlocks);
-
+  long long unsigned int totalNumofBlocks = (long long unsigned int) superBlock->s_blocks_count;
+  long long unsigned int totalNumofInodes = (long long unsigned int) superBlock->s_inodes_count;
+  long long unsigned int freeBlocks = (long long unsigned int) groupBlock->bg_free_blocks_count;
+  long long unsigned int freeInodes = (long long unsigned int) groupBlock->bg_free_inodes_count;
+  long long unsigned int freeBlockBitmapNum = (long long unsigned int) groupBlock->bg_block_bitmap;
+  long long unsigned int freeInodeBitmapNum = (long long unsigned int) groupBlock->bg_inode_bitmap;
+  long long unsigned int firstInodeBlockNum = (long long unsigned int) groupBlock->bg_inode_table;
+  fprintf(stdout, "GROUP,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n", blockNum, totalNumofBlocks, totalNumofInodes, freeBlocks, freeInodes, freeBlockBitmapNum, freeInodeBitmapNum, firstInodeBlockNum);
 }
 
 int
