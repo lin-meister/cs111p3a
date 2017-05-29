@@ -36,6 +36,7 @@ void printSuperblock()
   long long unsigned int inodesPerGroup = (long long unsigned int) superBlock->s_inodes_per_group;
   long long unsigned int firstUnreservedInode = (long long unsigned int) superBlock->s_first_ino;
   fprintf(stdout, "SUPERBLOCK,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n", blocksCount, inodesCount, blockSize, inodeSize, blocksPerGroup, inodesPerGroup, firstUnreservedInode);
+<<<<<<< HEAD
 }
 
 void printGroupBlock() {
@@ -44,6 +45,8 @@ void printGroupBlock() {
   long long unsigned int totalNumofBlocks =(long long unsigned int) groupBlock-> bg_block_bitmap;
   fprintf(stdout, "GROUP,%d,%llu\n",blockNum,totalNumofBlocks);
 
+=======
+>>>>>>> 69ee6451c250f3066e453962e8ec4472a320fcc5
 }
 
 int
