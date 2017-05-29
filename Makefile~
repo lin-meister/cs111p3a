@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS = -lm -o
+CFLAGS = -o -lm
 EXECNAME=lab3a
 
 default: lab3a.c

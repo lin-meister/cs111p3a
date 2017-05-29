@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -11,7 +12,9 @@
 
 struct ext2_super_block * superBlock;
 struct ext2_group_desc * groupBlock;
-unsigned char * bitmap;
+
+unsigned char *blockBitmap;
+unsigned char *inodeBitmap;
 
 int fd;
 
@@ -19,7 +22,7 @@ void freeMemory()
 {
   free(superBlock);
   free(groupBlock);
-  free(bitmap);
+  free(blockBitmap);
 }
 
 void error(char* msg)
@@ -56,13 +59,49 @@ void printGroupBlock() {
   fprintf(stdout, "GROUP,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n", blockNum, totalNumofBlocks, totalNumofInodes, freeBlocks, freeInodes, freeBlockBitmapNum, freeInodeBitmapNum, firstInodeBlockNum);
 }
 
-void printFreeBlockEntries()
-{
-  bitmap = (unsigned char *) malloc(BUF_SIZE);
-  if (pread(fd, bitmap, BUF_SIZE, freeBlockBitmapNum) == -1)
-    error("Unable to pread bitmap");
-  
-  printf("%s\n", bitmap[0]);
+void printFreeBlock(int blockNum) {
+  fprintf(stdout, "BFREE,%d\n",blockNum);
+}
+
+void printFreeBlocks() {
+
+  long long unsigned int totalNumOfBlocks = (long long unsigned int) superBlock->s_blocks_count;
+  int byte,bit;
+
+  for (byte = 0;byte < (totalNumOfBlocks-1)/8+1; byte++)
+    {
+      unsigned int mapByte = (int) blockBitmap[byte];
+      int bit = 0;
+      for(bit = 0; bit < 8 && ((byte*8)+(bit+1)) < totalNumOfBlocks; bit++)
+	{
+	  //	  printf("2^Bit is %d,byte is %d, mapByte is %u,is free is %u\n",2^bit,byte,mapByte,(mapByte & (unsigned int)(pow(2,bit))));
+	  if(!(mapByte & (unsigned int) (pow(2,bit))))
+	    printFreeBlock((byte*8)+(bit+1));
+	}
+    }
+}
+ 
+void printFreeInode(int inodeNum) {
+  fprintf(stdout, "IFREE,%d\n",inodeNum);
+}
+
+void printFreeInodes() {
+
+  long long unsigned int totalNumOfInodes = (long long unsigned int) superBlock->s_inodes_count;
+  int byte,bit;
+
+  for (byte = 0;byte < (totalNumOfInodes-1)/8+1; byte++)
+    {
+      unsigned int mapByte = (int) inodeBitmap[byte];
+      int bit = 0;
+      for(bit = 0; bit < 8 && ((byte*8)+(bit)) < totalNumOfInodes; bit++)
+        {
+	  //          printf("2^Bit is %d,byte is %d, mapByte is %u,is free is %u\n",2^bit,byte,mapByte,(mapByte & (unsigned int)(pow(2,bit))));
+	  if(!(mapByte & (unsigned int) (pow(2,bit))))
+	    printFreeInode((byte*8)+(bit+1));
+	}
+    }
+
 }
 
 int
@@ -86,7 +125,13 @@ main (int argc, char **argv)
 
   printGroupBlock();
 
-  printFreeBlockEntries();
+  blockBitmap = malloc (BUF_SIZE);
+  pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*3);
+  printFreeBlocks();
+
+  inodeBitmap = malloc (BUF_SIZE);
+  pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*4);
+  printFreeInodes();
 
   return 0;
 }
