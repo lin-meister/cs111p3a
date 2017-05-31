@@ -1,10 +1,13 @@
-#include <math.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdlib.h>
 
 #include "ext2_fs.h"
 
@@ -17,12 +20,15 @@ unsigned char *blockBitmap;
 unsigned char *inodeBitmap;
 
 int fd;
+int numberOfInodes;
 
 void freeMemory()
 {
   free(superBlock);
   free(groupBlock);
   free(blockBitmap);
+  free(inodeBitmap);
+  
 }
 
 void error(char* msg)
@@ -86,7 +92,6 @@ void printFreeInode(int inodeNum) {
 }
 
 void printFreeInodes() {
-
   long long unsigned int totalNumOfInodes = (long long unsigned int) superBlock->s_inodes_count;
   int byte,bit;
 
@@ -101,7 +106,67 @@ void printFreeInodes() {
 	    printFreeInode((byte*8)+(bit+1));
 	}
     }
+}
 
+char getFileType(long long unsigned int mode)   {
+  if(mode & 0xA000 && mode & 0x2000)
+    return 's';
+  else if(mode & 0x8000)
+    return 'f';
+  else if(mode & 0x4000)
+    return 'd';
+  else
+    return '?';
+}
+
+void printInodeSummaries(struct ext2_inode * inodes) {
+  time_t rawTime = (time_t) inodes->i_atime;
+  char timeString[100];
+  strftime(timeString, 100, "%m/%d/%y %l:%M:%S %p GMT", gmtime(&rawTime));
+  fprintf(stdout, "%s\n", timeString);
+}
+
+struct ext2_dir_entry * entry;
+struct ext2_inode * inode;
+
+void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int byteOffset) {
+  unsigned long long int fileInode = entry->inode;
+  unsigned long long int entryLength = entry->rec_len;
+  unsigned long long int fileType = entry->file_type;
+  char fileName[EXT2_NAME_LEN+1];
+  memcpy(fileName, entry->name, strlen(entry->name));
+  fileName[strlen(entry->name)] = '\0';
+  unsigned long long int fileNameLength = strlen(fileName);
+  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset,fileInode, entryLength, fileNameLength, fileName);
+}
+
+void printDirectoryEntries(struct ext2_inode * inodes) {
+  unsigned char block[BUF_SIZE];
+  struct ext2_dir_entry * entry;
+  
+  int i, j;
+  int size = 0;
+  int blockNum = 0;
+  unsigned long long int byteOffset = 0;
+  for (i = 0; i < numberOfInodes; i++) {
+    inode = inodes+i;
+    if (getFileType((long long unsigned int) inode->i_mode) == 'd') {
+      pread(fd, block, BUF_SIZE, inode->i_block[blockNum]*BUF_SIZE);
+      entry = (struct ext2_dir_entry *) block;
+      printf("Size: %llu\n", (long long unsigned int) inode->i_size);
+      printf("Block count: %llu\n", (long long unsigned int) inode->i_blocks);
+
+      for (size = 0; size < EXT2_NDIR_BLOCKS; size++) {
+      	if (entry->inode != 0)
+	  printDirectoryEntry(entry, byteOffset);
+	byteOffset += entry->rec_len;
+	entry = (void*) entry + entry->rec_len;
+      }
+
+      size = 0;
+      byteOffset = 0;
+    }
+  }
 }
 
 int
@@ -112,11 +177,15 @@ main (int argc, char **argv)
   fd = open(img, O_RDONLY);
   if (fd == -1)
     error("Unable to read file system image");
+
+  int blockToRead;
   
   superBlock = (struct ext2_super_block *) malloc (BUF_SIZE);
   if (pread(fd, superBlock, BUF_SIZE, BUF_SIZE) == -1)
     error("Unable to pread from superblock");
-
+  if (superBlock->s_magic != EXT2_SUPER_MAGIC)
+    error("Bad file system");
+  
   printSuperblock();
 
   groupBlock = (struct ext2_group_desc *) malloc (BUF_SIZE);
@@ -133,5 +202,15 @@ main (int argc, char **argv)
   pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*4);
   printFreeInodes();
 
+  unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
+  numberOfInodes = (long long unsigned int) superBlock->s_inodes_per_group;
+  unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
+
+  blockToRead = 5;
+  struct ext2_inode inodes[numberOfInodes];
+  pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
+  printInodeSummaries(inodes);
+  //  printDirectoryEntries(inodes);
+  
   return 0;
 }
