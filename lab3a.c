@@ -171,7 +171,7 @@ void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int b
   memcpy(fileName, entry->name, strlen(entry->name));
   fileName[strlen(entry->name)] = '\0';
   unsigned long long int fileNameLength = strlen(fileName);
-  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset,fileInode, entryLength, fileNameLength, fileName);
+  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset, fileInode, entryLength, fileNameLength, fileName);
 }
 
 void printDirectoryEntries(struct ext2_inode * inodes) {
@@ -191,13 +191,12 @@ void printDirectoryEntries(struct ext2_inode * inodes) {
       printf("Block count: %llu\n", (long long unsigned int) inode->i_blocks);
 
       for (size = 0; size < EXT2_NDIR_BLOCKS; size++) {
-      	if (entry->inode != 0)
+	if (entry->inode != 0)
 	  printDirectoryEntry(entry, byteOffset);
 	byteOffset += entry->rec_len;
 	entry = (void*) entry + entry->rec_len;
       }
 
-      size = 0;
       byteOffset = 0;
     }
   }
@@ -242,19 +241,19 @@ main (int argc, char **argv)
     
   printFreeInodes(isInodeUsed);
 
-    blockToRead = 5;
-
-    unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
-    unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
+  blockToRead = 5;
+  
+  unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
+  unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
+  
+  struct ext2_inode inodes[numberOfInodes];
+  pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
+  printInodeSummaries(inodes, isInodeUsed);
+  
+  printDirectoryEntries(inodes);
     
-    struct ext2_inode inodes[numberOfInodes];
-    pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
-    printInodeSummaries(inodes, isInodeUsed);
-    
-    
-    
-    blockToRead += inodeTableBlocks;
-    
+  blockToRead += inodeTableBlocks;
+  
     
   return 0;
 }
