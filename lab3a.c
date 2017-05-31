@@ -154,9 +154,9 @@ void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
     
     int inodeCounter;
     for (inodeCounter = 1;inodeCounter <= numberOfInodes; inodeCounter++) {
-        struct ext2_inode* thisInode = &inodes[inodeCounter-1];
-        if(isInodeUsed[inodeCounter-1] == 1 && thisInode->i_links_count > 0)
-            printInodeSummary(thisInode,inodeCounter);
+      //struct ext2_inode* thisInode = &inodes[inodeCounter-1];
+      if(isInodeUsed[inodeCounter-1] == 1 && inodes[inodeCounter-1].i_links_count > 0)
+	printInodeSummary(&inodes[inodeCounter-1],inodeCounter);
     }
 }
 
@@ -183,22 +183,23 @@ void printDirectoryEntries(struct ext2_inode * inodes) {
   int blockNum = 0;
   unsigned long long int byteOffset = 0;
   for (i = 0; i < numberOfInodes; i++) {
-    inode = inodes+i;
-    if (getFileType((long long unsigned int) inode->i_mode) == 'd') {
-      pread(fd, block, BUF_SIZE, inode->i_block[blockNum]*BUF_SIZE);
-      entry = (struct ext2_dir_entry *) block;
-      printf("Size: %llu\n", (long long unsigned int) inode->i_size);
-      printf("Block count: %llu\n", (long long unsigned int) inode->i_blocks);
-
-      for (size = 0; size < EXT2_NDIR_BLOCKS; size++) {
-	if (entry->inode != 0)
-	  printDirectoryEntry(entry, byteOffset);
-	byteOffset += entry->rec_len;
-	entry = (void*) entry + entry->rec_len;
-      }
-
-      byteOffset = 0;
-    }
+     inode = inodes+i;
+     if (getFileType((long long unsigned int) inode->i_mode) == 'd') {
+       pread(fd, block, BUF_SIZE, inode->i_block[blockNum]*BUF_SIZE);
+       entry = (struct ext2_dir_entry *) block;
+       printf("Size: %llu\n", (long long unsigned int) inode->i_size);
+       printf("Block count: %llu\n", (long long unsigned int) inode->i_blocks);
+       
+       for (size = 0; size < EXT2_NDIR_BLOCKS; size++) {
+	 if (entry->inode != 0)
+	   printDirectoryEntry(entry, byteOffset);
+	 byteOffset += entry->rec_len;
+	 entry = (void*) entry + entry->rec_len;
+       }
+       
+       size = 0;
+       byteOffset = 0;
+     }
   }
 }
 
