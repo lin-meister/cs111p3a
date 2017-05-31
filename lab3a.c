@@ -157,7 +157,6 @@ void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
       //struct ext2_inode* thisInode = &inodes[inodeCounter-1];
       if(isInodeUsed[inodeCounter-1] == 1 && inodes[inodeCounter-1].i_links_count > 0)
 	printInodeSummary(&inodes[inodeCounter-1],inodeCounter);
-      
     }
 }
 
