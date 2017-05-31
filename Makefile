@@ -1,10 +1,10 @@
 
 CC=gcc
-CFLAGS=-lm -o
+CFLAGS = -lm -o
 EXECNAME=lab3a
 
 default: lab3a.c
-	$(CC) lab3a.c $(CFLAGS) $(EXECNAME)
+	$(CC) $(CFLAGS) $(EXECNAME) lab3a.c
 	chmod +x ./$(EXECNAME)
 
 clean:

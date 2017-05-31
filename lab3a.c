@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -6,10 +7,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-#include <math.h>
-#include <string.h>
-#include <time.h>
-#include <stdlib.h>
 
 #include "ext2_fs.h"
 
@@ -30,8 +27,6 @@ void freeMemory()
   free(superBlock);
   free(groupBlock);
   free(blockBitmap);
-  free(inodeBitmap);
-  
 }
 
 void error(char* msg)
@@ -94,7 +89,12 @@ void printFreeInode(int inodeNum) {
   fprintf(stdout, "IFREE,%d\n",inodeNum);
 }
 
+<<<<<<< HEAD
 void printFreeInodes(int* isInodeUsed) {
+=======
+void printFreeInodes() {
+
+>>>>>>> parent of d61dafe... Added directory entry code
   long long unsigned int totalNumOfInodes = (long long unsigned int) superBlock->s_inodes_count;
   int byte,bit;
 
@@ -113,6 +113,7 @@ void printFreeInodes(int* isInodeUsed) {
         }
         
     }
+<<<<<<< HEAD
 }
 
 
@@ -200,6 +201,9 @@ void printDirectoryEntries(struct ext2_inode * inodes) {
       byteOffset = 0;
     }
   }
+=======
+
+>>>>>>> parent of d61dafe... Added directory entry code
 }
 
 int
@@ -208,12 +212,11 @@ main (int argc, char **argv)
   // File system image name is in argv
   char * img = argv[1];
   fd = open(img, O_RDONLY);
-  if (fd == -1)
-    error("Unable to open disk image");
-  
-    int blockToRead = 1;
+
+  int blockToRead = 1;
   superBlock = (struct ext2_super_block *) malloc (BUF_SIZE);
-  pread(fd, superBlock, BUF_SIZE, BUF_SIZE*blockToRead);
+  if (pread(fd, superBlock, BUF_SIZE, BUF_SIZE) == -1)
+    error("Unable to pread from superblock");
 
   printSuperblock();
     blockToRead = 2;
@@ -254,6 +257,5 @@ main (int argc, char **argv)
     
   blockToRead += inodeTableBlocks;
   
-    
   return 0;
 }
