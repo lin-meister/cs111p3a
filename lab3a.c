@@ -162,8 +162,10 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
             printDirectoryEntry(entry, byteOffset);
         byteOffset += entry->rec_len;
         size += entry->rec_len;
+        printf("Dirent size is %u, searched size is %d, dirsize is %u\n",entry->rec_len,size, inode->i_size);
+
+        
         entry = (void*) entry + entry->rec_len;
-        printf("Dirent size is %u\n",entry->rec_len);
     }
     byteOffset = 0;
     size = 0;
