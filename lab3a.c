@@ -251,9 +251,8 @@ main (int argc, char **argv)
     pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
     printInodeSummaries(inodes, isInodeUsed);
     
-    
-    
     blockToRead += inodeTableBlocks;
+    
     
     
   return 0;
