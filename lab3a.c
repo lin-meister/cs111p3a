@@ -171,7 +171,7 @@ void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int b
   memcpy(fileName, entry->name, strlen(entry->name));
   fileName[strlen(entry->name)] = '\0';
   unsigned long long int fileNameLength = strlen(fileName);
-  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset, fileInode, entryLength, fileNameLength, fileName);
+  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset,fileInode, entryLength, fileNameLength, fileName);
 }
 
 void printDirectoryEntries(struct ext2_inode * inode) {
@@ -182,6 +182,7 @@ void printDirectoryEntries(struct ext2_inode * inode) {
   int size = 0;
   int blockNum = 0;
   unsigned long long int byteOffset = 0;
+
   if (getFileType((long long unsigned int) inode->i_mode) == 'd') {
     pread(fd, block, BUF_SIZE, inode->i_block[blockNum]*BUF_SIZE);
     entry = (struct ext2_dir_entry *) block;
@@ -250,6 +251,5 @@ main (int argc, char **argv)
 
   blockToRead += inodeTableBlocks;
   
-    
   return 0;
 }
