@@ -2,7 +2,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <math.h>
 #include <string.h>
@@ -19,8 +21,9 @@ struct ext2_group_desc * groupBlock;
 unsigned char *blockBitmap;
 unsigned char *inodeBitmap;
 
+unsigned int numberOfInodes;
+
 int fd;
-int numberOfInodes;
 
 void freeMemory()
 {
@@ -91,7 +94,7 @@ void printFreeInode(int inodeNum) {
   fprintf(stdout, "IFREE,%d\n",inodeNum);
 }
 
-void printFreeInodes() {
+void printFreeInodes(int* isInodeUsed) {
   long long unsigned int totalNumOfInodes = (long long unsigned int) superBlock->s_inodes_count;
   int byte,bit;
 
@@ -104,26 +107,57 @@ void printFreeInodes() {
 	  //          printf("2^Bit is %d,byte is %d, mapByte is %u,is free is %u\n",2^bit,byte,mapByte,(mapByte & (unsigned int)(pow(2,bit))));
 	  if(!(mapByte & (unsigned int) (pow(2,bit))))
 	    printFreeInode((byte*8)+(bit+1));
-	}
+      else
+          isInodeUsed[(byte*8) + bit] = 1;
+
+        }
+        
     }
 }
 
+
 char getFileType(long long unsigned int mode)   {
-  if(mode & 0xA000 && mode & 0x2000)
-    return 's';
-  else if(mode & 0x8000)
-    return 'f';
-  else if(mode & 0x4000)
-    return 'd';
-  else
-    return '?';
+    if(mode & 0xA000 && mode & 0x2000)
+        return 's';
+    else if(mode & 0x8000)
+        return 'f';
+    else if(mode & 0x4000)
+        return 'd';
+    else
+        return '?';
 }
 
-void printInodeSummaries(struct ext2_inode * inodes) {
-  time_t rawTime = (time_t) inodes->i_atime;
-  char timeString[100];
-  strftime(timeString, 100, "%m/%d/%y %l:%M:%S %p GMT", gmtime(&rawTime));
-  fprintf(stdout, "%s\n", timeString);
+
+void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
+    
+    long long unsigned int i_mode = (long long unsigned int) thisInode->i_mode;
+    char fileType = getFileType(i_mode);
+    
+    long long unsigned int mode = i_mode & 0xFFF;
+    
+    time_t rawAccessTime = (time_t) thisInode->i_atime;
+    char accessTimeString[100];
+    strftime(accessTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawAccessTime));
+
+    time_t rawCreationTime = (time_t) thisInode->i_ctime;
+    char creationTimeString[100];
+    strftime(creationTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawCreationTime));
+    
+    time_t rawModTime = (time_t) thisInode->i_mtime;
+    char modTimeString[100];
+    strftime(modTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawModTime));
+    
+    fprintf(stdout, "INODE,%d,%c,%llo,%llu,%llu,%llu,%s,%s,%s,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",inodeNum, fileType, mode, (long long unsigned int) thisInode->i_uid, (long long unsigned int) thisInode->i_gid, (long long unsigned int)thisInode->i_links_count, creationTimeString, modTimeString, accessTimeString, (long long unsigned int) thisInode->i_size, (long long unsigned int) thisInode->i_blocks, (long long unsigned int) thisInode->i_block[0], (long long unsigned int) thisInode->i_block[1], (long long unsigned int) thisInode->i_block[2], (long long unsigned int) thisInode->i_block[3], (long long unsigned int) thisInode->i_block[4], (long long unsigned int) thisInode->i_block[5], (long long unsigned int) thisInode->i_block[6], (long long unsigned int) thisInode->i_block[7], (long long unsigned int) thisInode->i_block[8], (long long unsigned int) thisInode->i_block[9], (long long unsigned int) thisInode->i_block[10], (long long unsigned int) thisInode->i_block[11], (long long unsigned int) thisInode->i_block[12], (long long unsigned int) thisInode->i_block[13], (long long unsigned int) thisInode->i_block[14]);
+}
+
+void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
+    
+    int inodeCounter;
+    for (inodeCounter = 1;inodeCounter <= numberOfInodes; inodeCounter++) {
+        struct ext2_inode* thisInode = &inodes[inodeCounter-1];
+        if(isInodeUsed[inodeCounter-1] == 1 && thisInode->i_links_count > 0)
+            printInodeSummary(thisInode,inodeCounter);
+    }
 }
 
 struct ext2_dir_entry * entry;
@@ -176,41 +210,51 @@ main (int argc, char **argv)
   char * img = argv[1];
   fd = open(img, O_RDONLY);
   if (fd == -1)
-    error("Unable to read file system image");
-
-  int blockToRead;
+    error("Unable to open disk image");
   
+    int blockToRead = 1;
   superBlock = (struct ext2_super_block *) malloc (BUF_SIZE);
-  if (pread(fd, superBlock, BUF_SIZE, BUF_SIZE) == -1)
-    error("Unable to pread from superblock");
-  if (superBlock->s_magic != EXT2_SUPER_MAGIC)
-    error("Bad file system");
-  
+  pread(fd, superBlock, BUF_SIZE, BUF_SIZE*blockToRead);
+
   printSuperblock();
+    blockToRead = 2;
 
+    
   groupBlock = (struct ext2_group_desc *) malloc (BUF_SIZE);
-  if (pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*2) == -1)
-    error("Unable to pread from group block");
+  pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*blockToRead);
+    printGroupBlock();
 
-  printGroupBlock();
-
+    blockToRead = 3;
+    
+    
   blockBitmap = malloc (BUF_SIZE);
-  pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*3);
-  printFreeBlocks();
+  pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*blockToRead);
+    printFreeBlocks();
+    
+    numberOfInodes = (long long unsigned int) superBlock->s_inodes_per_group;
+    int isInodeUsed[numberOfInodes];
+    memset(isInodeUsed, 0, sizeof(isInodeUsed));
+    
+    blockToRead = 4;
 
   inodeBitmap = malloc (BUF_SIZE);
-  pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*4);
-  printFreeInodes();
+  pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*blockToRead);
+    
+  printFreeInodes(isInodeUsed);
 
-  unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
-  numberOfInodes = (long long unsigned int) superBlock->s_inodes_per_group;
-  unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
+    blockToRead = 5;
 
-  blockToRead = 5;
-  struct ext2_inode inodes[numberOfInodes];
-  pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
-  printInodeSummaries(inodes);
-  //  printDirectoryEntries(inodes);
-  
+    unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
+    unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
+    
+    struct ext2_inode inodes[numberOfInodes];
+    pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
+    printInodeSummaries(inodes, isInodeUsed);
+    
+    
+    
+    blockToRead += inodeTableBlocks;
+    
+    
   return 0;
 }
