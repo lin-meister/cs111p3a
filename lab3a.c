@@ -133,7 +133,7 @@ char getFileType(long long unsigned int mode)   {
 struct ext2_dir_entry * entry;
 struct ext2_inode * inode;
 
-void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int byteOffset) {
+void printDirectoryEntry(struct ext2_dir_entry * entry, int inodeNum, unsigned long long int byteOffset) {
   unsigned long long int fileInode = entry->inode;
   unsigned long long int entryLength = entry->rec_len;
   unsigned long long int fileType = entry->file_type;
@@ -141,7 +141,7 @@ void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int b
   memcpy(fileName, entry->name, strlen(entry->name));
   fileName[strlen(entry->name)] = '\0';
   unsigned long long int fileNameLength = strlen(fileName);
-  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset, fileInode, entryLength, fileNameLength, fileName);
+  fprintf(stdout, "DIRENT,%d,%llu,%llu,%llu,%llu,%s\n", inodeNum, byteOffset, fileInode, entryLength, fileNameLength, fileName);
 }
 
 void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
@@ -150,24 +150,17 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
     unsigned int numBlocks = inode->i_blocks/2;
     unsigned char block[BUF_SIZE*numBlocks];
     
-    int i, j;
-    int size = 0;
-    int blockNum = 0;
-    unsigned long long int byteOffset = 0;
+    int i, size = 0, blockNum = 0;
+
     pread(fd, block, BUF_SIZE*numBlocks, inode->i_block[blockNum]*BUF_SIZE);
     entry = (struct ext2_dir_entry *) block;
     
     while(size < inode->i_size) {
-        if (entry->inode != 0)
-            printDirectoryEntry(entry, byteOffset);
-        byteOffset += entry->rec_len;
-        size += entry->rec_len;
-        //printf("Dirent size is %u, searched size is %d, dirsize is %u\n",entry->rec_len,size, inode->i_size);
-
-        
-        entry = (void*) entry + entry->rec_len;
+      if (entry->inode != 0)
+	printDirectoryEntry(entry, inodeNum, size);
+      size += entry->rec_len;      
+      entry = (void*) entry + entry->rec_len;
     }
-    byteOffset = 0;
     size = 0;
 }
 
@@ -255,10 +248,7 @@ main (int argc, char **argv)
   pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
   printInodeSummaries(inodes, isInodeUsed);
 
-    
   blockToRead += inodeTableBlocks;
   
-    
-    
   return 0;
 }
