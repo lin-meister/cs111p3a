@@ -195,6 +195,7 @@ void printDirectoryEntries(struct ext2_inode * inodes) {
 	  printDirectoryEntry(entry, byteOffset);
 	byteOffset += entry->rec_len;
 	entry = (void*) entry + entry->rec_len;
+          printf("on number %d\n",size)
       }
 
       byteOffset = 0;
