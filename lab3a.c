@@ -25,21 +25,23 @@ unsigned int numberOfInodes;
 
 int fd;
 
+//Free memory for all allocated blocks
 void freeMemory()
 {
   free(superBlock);
   free(groupBlock);
   free(blockBitmap);
-  free(inodeBitmap);
-  
+  free(inodeBitmap);  
 }
 
+//Error return function
 void error(char* msg)
 {
   fprintf(stderr, "%s\n", msg);
   exit(2);
 }
 
+//
 void printSuperblock()
 {
   long long unsigned int blocksCount = (long long unsigned int) superBlock->s_blocks_count;
@@ -324,5 +326,7 @@ main (int argc, char **argv)
 
   blockToRead += inodeTableBlocks;
   
+  freeMemory();
+
   return 0;
 }

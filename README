@@ -35,3 +35,16 @@ The following links were referenced during this project.
 
 http://cs.smith.edu/~nhowe/262/oldlabs/ext2.html
 http://www.nongnu.org/ext2-doc/ext2.html
+
+Limitations
+======
+No limitations
+
+Features
+======
+Everything that is required is included.
+
+Testing Methodology
+======
+First tested by looking at disk image and seeing what outputs for fields for things such as the superblock were. 
+Next tested final outputs by doing diff with provided trivial.csv
