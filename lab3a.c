@@ -150,7 +150,8 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
     
     int i, size = 0, blockNum = 0;
 
-    pread(fd, block, BUF_SIZE*numBlocks, inode->i_block[blockNum]*BUF_SIZE);
+    if (pread(fd, block, BUF_SIZE*numBlocks, inode->i_block[blockNum]*BUF_SIZE) == -1)
+      error("Error reading directory entries");
     entry = (struct ext2_dir_entry *) block;
     
     while (size < inode->i_size) {
@@ -285,33 +286,35 @@ main (int argc, char **argv)
   if (fd == -1)
     error("Unable to open disk image");
   
-    int blockToRead = 1;
+  int blockToRead = 1;
   superBlock = (struct ext2_super_block *) malloc (BUF_SIZE);
-  pread(fd, superBlock, BUF_SIZE, BUF_SIZE*blockToRead);
+  if (pread(fd, superBlock, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
+    error("Error reading superblock");
 
   printSuperblock();
-    blockToRead = 2;
-
-    
+  blockToRead = 2;
+  
   groupBlock = (struct ext2_group_desc *) malloc (BUF_SIZE);
-  pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*blockToRead);
-    printGroupBlock();
+  if (pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
+    error("Error reading groups");
+  printGroupBlock();
 
-    blockToRead = 3;
-    
+  blockToRead = 3;    
     
   blockBitmap = malloc (BUF_SIZE);
-  pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*blockToRead);
-    printFreeBlocks();
+  if (pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
+    error("Error reading block bitmap");
+  printFreeBlocks();
     
-    numberOfInodes = (long long unsigned int) superBlock->s_inodes_per_group;
-    int isInodeUsed[numberOfInodes];
-    memset(isInodeUsed, 0, sizeof(isInodeUsed));
+  numberOfInodes = (long long unsigned int) superBlock->s_inodes_per_group;
+  int isInodeUsed[numberOfInodes];
+  memset(isInodeUsed, 0, sizeof(isInodeUsed));
     
-    blockToRead = 4;
+  blockToRead = 4;
 
   inodeBitmap = malloc (BUF_SIZE);
-  pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*blockToRead);
+  if (pread(fd, inodeBitmap, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
+    error("Error reading inode bitmap");
     
   printFreeInodes(isInodeUsed);
 
@@ -321,7 +324,8 @@ main (int argc, char **argv)
   unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
   
   struct ext2_inode inodes[numberOfInodes];
-  pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
+  if (pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead) == -1)
+    error("Error reading inode table");
   printInodeSummaries(inodes, isInodeUsed);
 
   blockToRead += inodeTableBlocks;
