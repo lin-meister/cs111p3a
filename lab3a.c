@@ -127,9 +127,6 @@ char getFileType(long long unsigned int mode)   {
         return '?';
 }
 
-
-
-
 struct ext2_dir_entry * entry;
 struct ext2_inode * inode;
 
@@ -141,11 +138,10 @@ void printDirectoryEntry(struct ext2_dir_entry * entry, int inodeNum, unsigned l
   memcpy(fileName, entry->name, strlen(entry->name));
   fileName[strlen(entry->name)] = '\0';
   unsigned long long int fileNameLength = strlen(fileName);
-  fprintf(stdout, "DIRENT,%d,%llu,%llu,%llu,%llu,%s\n", inodeNum, byteOffset, fileInode, entryLength, fileNameLength, fileName);
+  fprintf(stdout, "DIRENT,%d,%llu,%llu,%llu,%llu,'%s'\n", inodeNum, byteOffset, fileInode, entryLength, fileNameLength, fileName);
 }
 
-void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
-  
+void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {  
     struct ext2_dir_entry * entry;
     unsigned int numBlocks = inode->i_blocks/2;
     unsigned char block[BUF_SIZE*numBlocks];
@@ -156,12 +152,34 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
     entry = (struct ext2_dir_entry *) block;
     
     while(size < inode->i_size) {
-      if (entry->inode != 0)
-	printDirectoryEntry(entry, inodeNum, size);
+      if (entry->inode == 0)
+	break;
+      printDirectoryEntry(entry, inodeNum, size);
       size += entry->rec_len;      
       entry = (void*) entry + entry->rec_len;
     }
-    size = 0;
+}
+
+void printIndirectBlock(struct ext2_inode * inode, int inodeNum, int level, int offset) {
+  if (inode->i_block[offset] == 0 || level == 0)
+    return;
+
+  long long unsigned int indirectBlockNum = inode->i_block[offset];
+
+  // Get the pointers stored at the indirect block
+  unsigned int indirectBlockPtrs[BUF_SIZE/sizeof(unsigned int)];
+  if (pread(fd, indirectBlockPtrs, BUF_SIZE, indirectBlockNum * BUF_SIZE) == -1)
+    error("Unable to read indirect block pointers");
+
+  int i;
+  for (i = 0; i < BUF_SIZE/4; i++) {
+    if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
+      fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", inodeNum, level, offset+i, indirectBlockNum, indirectBlockPtrs[i]);
+    }
+
+  }
+
+
 }
 
 void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
@@ -185,20 +203,19 @@ void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
     
     fprintf(stdout, "INODE,%d,%c,%llo,%llu,%llu,%llu,%s,%s,%s,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",inodeNum, fileType, mode, (long long unsigned int) thisInode->i_uid, (long long unsigned int) thisInode->i_gid, (long long unsigned int)thisInode->i_links_count, creationTimeString, modTimeString, accessTimeString, (long long unsigned int) thisInode->i_size, (long long unsigned int) thisInode->i_blocks, (long long unsigned int) thisInode->i_block[0], (long long unsigned int) thisInode->i_block[1], (long long unsigned int) thisInode->i_block[2], (long long unsigned int) thisInode->i_block[3], (long long unsigned int) thisInode->i_block[4], (long long unsigned int) thisInode->i_block[5], (long long unsigned int) thisInode->i_block[6], (long long unsigned int) thisInode->i_block[7], (long long unsigned int) thisInode->i_block[8], (long long unsigned int) thisInode->i_block[9], (long long unsigned int) thisInode->i_block[10], (long long unsigned int) thisInode->i_block[11], (long long unsigned int) thisInode->i_block[12], (long long unsigned int) thisInode->i_block[13], (long long unsigned int) thisInode->i_block[14]);
     if(fileType == 'd')
-        printDirectoryEntries(thisInode, inodeNum);
+      printDirectoryEntries(thisInode, inodeNum);
+    if (thisInode->i_block[12] != 0)
+      printIndirectBlock(thisInode, inodeNum, 1, 12);
 }
 
 void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
     
     int inodeCounter;
     for (inodeCounter = 1;inodeCounter <= numberOfInodes; inodeCounter++) {
-        //struct ext2_inode* thisInode = &inodes[inodeCounter-1];
-        if(isInodeUsed[inodeCounter-1] == 1 && inodes[inodeCounter-1].i_links_count > 0)
-            printInodeSummary(&inodes[inodeCounter-1],inodeCounter);
-        
+      if(isInodeUsed[inodeCounter-1] == 1 && inodes[inodeCounter-1].i_links_count > 0)
+	printInodeSummary(&inodes[inodeCounter-1],inodeCounter);       
     }
 }
-
 
 int
 main (int argc, char **argv)
