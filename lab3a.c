@@ -161,7 +161,37 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
     size = 0;
 }
 
-void printIndirectBlock(struct ext2_inode * inode, int inodeNum, int level, int nthBlock) {
+void printIndirectBlocks(int owningNum, int level, int logicalOffset, long long unsigned int thisBlockNum ) {
+  
+    if (thisBlockNum == 0 || level == 0)
+        return;
+    
+    unsigned int indirectBlockPtrs[BUF_SIZE/sizeof(unsigned int)];
+    if (pread(fd, indirectBlockPtrs, BUF_SIZE, thisBlockNum * BUF_SIZE) == -1)
+        error("Unable to read indirect block pointers");
+    
+    int incrementSize = 1;
+    if(level == 2)
+    {
+        incrementSize = 256;
+    }
+
+    int i;
+    for (i = 0; i < BUF_SIZE/4; i++) {
+        if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
+            fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", owningNum, level, logicalOffset+i*incrementSize, thisBlockNum, indirectBlockPtrs[i]);
+            //printIndirectBlock(inode, inodeNum, level-1, offset/12);
+        }
+    }
+    
+    if(level == 2) {
+        for (i = 0; i < BUF_SIZE/4; i++) {
+            printIndirectBlocks(owningNum, level - 1, logicalOffset + i*incrementSize, indirectBlockPtrs[i]);
+        }
+    }
+}
+
+void printIndirectBlockInit(struct ext2_inode * inode, int owningNum, int level, int nthBlock) {
   if (inode->i_block[nthBlock] == 0 || level == 0)
     return;
 
@@ -175,15 +205,27 @@ void printIndirectBlock(struct ext2_inode * inode, int inodeNum, int level, int 
   int offset = 12;
   int incrementSize = 1;
   
-  if(level = 2)
+  if(level == 2)
+    {
     offset += 256;
+    incrementSize = 256;
+    }
+  else if(level == 3)
+    {
+      offset += (256 + 65536);
+      incrementSize = 65536;
+    }
 
   int i;
   for (i = 0; i < BUF_SIZE/4; i++) {
     if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
-      fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", inodeNum, level, offset+i, indirectBlockNum, indirectBlockPtrs[i]);
+      fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", owningNum, level, offset+i*incrementSize, indirectBlockNum, indirectBlockPtrs[i]);
       //printIndirectBlock(inode, inodeNum, level-1, offset/12);
     }
+  }
+
+  for (i = 0; i < BUF_SIZE/4; i++) {
+      printIndirectBlocks(owningNum, level - 1, offset + i*incrementSize, indirectBlockPtrs[i]);
   }
 
   
@@ -212,11 +254,11 @@ void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
     if(fileType == 'd')
       printDirectoryEntries(thisInode, inodeNum);
     if (thisInode->i_block[12] != 0)
-      printIndirectBlock(thisInode, inodeNum, 1, 12);
+      printIndirectBlockInit(thisInode, inodeNum, 1, 12);
     if (thisInode->i_block[13] != 0)
-      printIndirectBlock(thisInode, inodeNum, 2, 13);
+      printIndirectBlockInit(thisInode, inodeNum, 2, 13);
     if (thisInode->i_block[14] != 0)
-      printIndirectBlock(thisInode, inodeNum, 3, 14);
+      printIndirectBlockInit(thisInode, inodeNum, 3, 14);
 }
 
 void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
@@ -232,6 +274,10 @@ int
 main (int argc, char **argv)
 {
   // File system image name is in argv
+  if (argc != 2) {
+    fprintf(stderr, "USAGE: ./lab3a FILESYSTEM.img\n");
+    exit(1);
+  }
   char * img = argv[1];
   fd = open(img, O_RDONLY);
   if (fd == -1)

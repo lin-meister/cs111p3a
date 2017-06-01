@@ -127,6 +127,109 @@ char getFileType(long long unsigned int mode)   {
         return '?';
 }
 
+struct ext2_dir_entry * entry;
+struct ext2_inode * inode;
+
+void printDirectoryEntry(struct ext2_dir_entry * entry, int inodeNum, unsigned long long int byteOffset) {
+  unsigned long long int fileInode = entry->inode;
+  unsigned long long int entryLength = entry->rec_len;
+  unsigned long long int fileType = entry->file_type;
+  char fileName[EXT2_NAME_LEN+1];
+  memcpy(fileName, entry->name, strlen(entry->name));
+  fileName[strlen(entry->name)] = '\0';
+  unsigned long long int fileNameLength = strlen(fileName);
+  fprintf(stdout, "DIRENT,%d,%llu,%llu,%llu,%llu,'%s'\n", inodeNum, byteOffset, fileInode, entryLength, fileNameLength, fileName);
+}
+
+void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {  
+    struct ext2_dir_entry * entry;
+    unsigned int numBlocks = inode->i_blocks/2;
+    unsigned char block[BUF_SIZE*numBlocks];
+    
+    int i, size = 0, blockNum = 0;
+
+    pread(fd, block, BUF_SIZE*numBlocks, inode->i_block[blockNum]*BUF_SIZE);
+    entry = (struct ext2_dir_entry *) block;
+    
+    while (size < inode->i_size) {
+      if (entry->inode == 0 || entry->rec_len == 0)
+	break;
+      printDirectoryEntry(entry, inodeNum, size);
+      size += entry->rec_len;      
+      entry = (void*) entry + entry->rec_len;
+    }
+    size = 0;
+}
+
+void printIndirectBlocks(int owningNum, int level, int logicalOffset, long long unsigned int thisBlockNum ) {
+  
+    if (thisBlockNum == 0 || level == 0)
+        return;
+    
+    unsigned int indirectBlockPtrs[BUF_SIZE/sizeof(unsigned int)];
+    if (pread(fd, indirectBlockPtrs, BUF_SIZE, thisBlockNum * BUF_SIZE) == -1)
+        error("Unable to read indirect block pointers");
+    
+    int incrementSize = 1;
+    if(level == 2)
+    {
+        incrementSize = 256;
+    }
+
+    int i;
+    for (i = 0; i < BUF_SIZE/4; i++) {
+        if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
+            fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", owningNum, level, logicalOffset+i*incrementSize, thisBlockNum, indirectBlockPtrs[i]);
+            //printIndirectBlock(inode, inodeNum, level-1, offset/12);
+        }
+    }
+    
+    if(level == 2) {
+        for (i = 0; i < BUF_SIZE/4; i++) {
+            printIndirectBlocks(owningNum, level - 1, logicalOffset + i*incrementSize, indirectBlockPtrs[i]);
+        }
+    }
+}
+
+void printIndirectBlockInit(struct ext2_inode * inode, int owningNum, int level, int nthBlock) {
+  if (inode->i_block[nthBlock] == 0 || level == 0)
+    return;
+
+  long long unsigned int indirectBlockNum = inode->i_block[nthBlock];
+
+  // Get the pointers stored at the indirect block
+  unsigned int indirectBlockPtrs[BUF_SIZE/sizeof(unsigned int)];
+  if (pread(fd, indirectBlockPtrs, BUF_SIZE, indirectBlockNum * BUF_SIZE) == -1)
+    error("Unable to read indirect block pointers");
+
+  int offset = 12;
+  int incrementSize = 1;
+  
+  if(level == 2)
+    {
+    offset += 256;
+    incrementSize = 256;
+    }
+  else if(level == 3)
+    {
+      offset += (256 + 65536);
+      incrementSize = 65536;
+    }
+
+  int i;
+  for (i = 0; i < BUF_SIZE/4; i++) {
+    if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
+      fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", owningNum, level, offset+i*incrementSize, indirectBlockNum, indirectBlockPtrs[i]);
+      //printIndirectBlock(inode, inodeNum, level-1, offset/12);
+    }
+  }
+
+  for (i = 0; i < BUF_SIZE/4; i++) {
+      printIndirectBlocks(owningNum, level - 1, offset + i*incrementSize, indirectBlockPtrs[i]);
+  }
+
+  
+}
 
 void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
     
@@ -138,7 +241,7 @@ void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
     time_t rawAccessTime = (time_t) thisInode->i_atime;
     char accessTimeString[100];
     strftime(accessTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawAccessTime));
-
+    
     time_t rawCreationTime = (time_t) thisInode->i_ctime;
     char creationTimeString[100];
     strftime(creationTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawCreationTime));
@@ -148,64 +251,33 @@ void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
     strftime(modTimeString, 100, "%m/%d/%y %H:%M:%S", gmtime(&rawModTime));
     
     fprintf(stdout, "INODE,%d,%c,%llo,%llu,%llu,%llu,%s,%s,%s,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",inodeNum, fileType, mode, (long long unsigned int) thisInode->i_uid, (long long unsigned int) thisInode->i_gid, (long long unsigned int)thisInode->i_links_count, creationTimeString, modTimeString, accessTimeString, (long long unsigned int) thisInode->i_size, (long long unsigned int) thisInode->i_blocks, (long long unsigned int) thisInode->i_block[0], (long long unsigned int) thisInode->i_block[1], (long long unsigned int) thisInode->i_block[2], (long long unsigned int) thisInode->i_block[3], (long long unsigned int) thisInode->i_block[4], (long long unsigned int) thisInode->i_block[5], (long long unsigned int) thisInode->i_block[6], (long long unsigned int) thisInode->i_block[7], (long long unsigned int) thisInode->i_block[8], (long long unsigned int) thisInode->i_block[9], (long long unsigned int) thisInode->i_block[10], (long long unsigned int) thisInode->i_block[11], (long long unsigned int) thisInode->i_block[12], (long long unsigned int) thisInode->i_block[13], (long long unsigned int) thisInode->i_block[14]);
+    if(fileType == 'd')
+      printDirectoryEntries(thisInode, inodeNum);
+    if (thisInode->i_block[12] != 0)
+      printIndirectBlockInit(thisInode, inodeNum, 1, 12);
+    if (thisInode->i_block[13] != 0)
+      printIndirectBlockInit(thisInode, inodeNum, 2, 13);
+    if (thisInode->i_block[14] != 0)
+      printIndirectBlockInit(thisInode, inodeNum, 3, 14);
 }
 
 void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
     
     int inodeCounter;
     for (inodeCounter = 1;inodeCounter <= numberOfInodes; inodeCounter++) {
-        struct ext2_inode* thisInode = &inodes[inodeCounter-1];
-        if(isInodeUsed[inodeCounter-1] == 1 && thisInode->i_links_count > 0)
-            printInodeSummary(thisInode,inodeCounter);
+      if(isInodeUsed[inodeCounter-1] == 1 && inodes[inodeCounter-1].i_links_count > 0)
+	printInodeSummary(&inodes[inodeCounter-1],inodeCounter);       
     }
-}
-
-struct ext2_dir_entry * entry;
-struct ext2_inode * inode;
-
-void printDirectoryEntry(struct ext2_dir_entry * entry, unsigned long long int byteOffset) {
-  unsigned long long int fileInode = entry->inode;
-  unsigned long long int entryLength = entry->rec_len;
-  unsigned long long int fileType = entry->file_type;
-  char fileName[EXT2_NAME_LEN+1];
-  memcpy(fileName, entry->name, strlen(entry->name));
-  fileName[strlen(entry->name)] = '\0';
-  unsigned long long int fileNameLength = strlen(fileName);
-  fprintf(stdout, "DIRENT,%llu,%llu,%llu,%llu,%s\n", byteOffset, fileInode, entryLength, fileNameLength, fileName);
-}
-
-void printDirectoryEntries(struct ext2_inode * inodes) {
-  unsigned char block[BUF_SIZE];
-  struct ext2_dir_entry * entry;
-  
-  int i, j;
-  int size = 0;
-  int blockNum = 0;
-  unsigned long long int byteOffset = 0;
-  for (i = 0; i < numberOfInodes; i++) {
-    inode = inodes+i;
-    if (getFileType((long long unsigned int) inode->i_mode) == 'd') {
-      pread(fd, block, BUF_SIZE, inode->i_block[blockNum]*BUF_SIZE);
-      entry = (struct ext2_dir_entry *) block;
-      printf("Size: %llu\n", (long long unsigned int) inode->i_size);
-      printf("Block count: %llu\n", (long long unsigned int) inode->i_blocks);
-
-      for (size = 0; size < EXT2_NDIR_BLOCKS; size++) {
-	if (entry->inode != 0)
-	  printDirectoryEntry(entry, byteOffset);
-	byteOffset += entry->rec_len;
-	entry = (void*) entry + entry->rec_len;
-      }
-
-      byteOffset = 0;
-    }
-  }
 }
 
 int
 main (int argc, char **argv)
 {
   // File system image name is in argv
+  if (argc != 1) {
+    fprintf(stderr, "USAGE: ./lab3a FILESYSTEM.img\n");
+    exit(1);
+  }
   char * img = argv[1];
   fd = open(img, O_RDONLY);
   if (fd == -1)
@@ -241,18 +313,6 @@ main (int argc, char **argv)
     
   printFreeInodes(isInodeUsed);
 
-<<<<<<< HEAD
-    blockToRead = 5;
-
-    unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
-    unsigned int inodeTableBlocks = numberOfInodes / inodesPerBlock;
-    
-    struct ext2_inode inodes[numberOfInodes];
-    pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
-    printInodeSummaries(inodes, isInodeUsed);
-    
-    blockToRead += inodeTableBlocks;
-=======
   blockToRead = 5;
   
   unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
@@ -261,13 +321,8 @@ main (int argc, char **argv)
   struct ext2_inode inodes[numberOfInodes];
   pread(fd, inodes, BUF_SIZE*inodeTableBlocks, BUF_SIZE*blockToRead);
   printInodeSummaries(inodes, isInodeUsed);
-  
-  printDirectoryEntries(inodes);
->>>>>>> 1505c16580cc323925be5ece4b541e99d45f735c
-    
+
   blockToRead += inodeTableBlocks;
   
-    
-    
   return 0;
 }
