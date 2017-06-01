@@ -2,5 +2,36 @@ NAME: Nikhil Bhatia, Chaoran Lin
 EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
 ID: 104132751 004674598
 
-# cs111p3a
-Project 3: File System Interpretation
+Included files
+======
+
+lab3a.c contains the code used to read a file system image and perform analysis
+on it. The analysis describes the super block, group blocks, free lists, indirect
+blocks, and directories.
+
+Makefile contains the code to create an executable, clean generated programs and
+output, and making a deliverable distribution tarball.
+
+README contains a description on the files of this project as well as the
+references we used.
+
+Slip day use
+======
+
+We would like to use one (1) slip day for this project.
+
+Nikhil Bhatia's slip days still available:
+Before this project: 4
+After this project: 3
+
+Chaoran Lin's slip days still available:
+Before this project: 4
+After this project: 3
+
+References
+======
+
+The following links were referenced during this project.
+
+http://cs.smith.edu/~nhowe/262/oldlabs/ext2.html
+http://www.nongnu.org/ext2-doc/ext2.html
