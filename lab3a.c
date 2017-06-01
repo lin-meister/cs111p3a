@@ -151,35 +151,42 @@ void printDirectoryEntries(struct ext2_inode * inode, int inodeNum) {
     pread(fd, block, BUF_SIZE*numBlocks, inode->i_block[blockNum]*BUF_SIZE);
     entry = (struct ext2_dir_entry *) block;
     
-    while(size < inode->i_size) {
-      if (entry->inode == 0)
+    while (size < inode->i_size) {
+      if (entry->inode == 0 || entry->rec_len == 0)
 	break;
       printDirectoryEntry(entry, inodeNum, size);
       size += entry->rec_len;      
       entry = (void*) entry + entry->rec_len;
     }
+    size = 0;
 }
 
-void printIndirectBlock(struct ext2_inode * inode, int inodeNum, int level, int offset) {
-  if (inode->i_block[offset] == 0 || level == 0)
+void printIndirectBlock(struct ext2_inode * inode, int inodeNum, int level, int nthBlock) {
+  if (inode->i_block[nthBlock] == 0 || level == 0)
     return;
 
-  long long unsigned int indirectBlockNum = inode->i_block[offset];
+  long long unsigned int indirectBlockNum = inode->i_block[nthBlock];
 
   // Get the pointers stored at the indirect block
   unsigned int indirectBlockPtrs[BUF_SIZE/sizeof(unsigned int)];
   if (pread(fd, indirectBlockPtrs, BUF_SIZE, indirectBlockNum * BUF_SIZE) == -1)
     error("Unable to read indirect block pointers");
 
+  int offset = 12;
+  int incrementSize = 1;
+  
+  if(level = 2)
+    offset += 256;
+
   int i;
   for (i = 0; i < BUF_SIZE/4; i++) {
     if (indirectBlockPtrs[i] != 0 && indirectBlockPtrs[i] < superBlock->s_blocks_count) {
       fprintf(stdout, "INDIRECT,%d,%d,%d,%llu,%u\n", inodeNum, level, offset+i, indirectBlockNum, indirectBlockPtrs[i]);
+      //printIndirectBlock(inode, inodeNum, level-1, offset/12);
     }
-
   }
 
-
+  
 }
 
 void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
@@ -206,6 +213,10 @@ void printInodeSummary(struct ext2_inode* thisInode, int inodeNum)   {
       printDirectoryEntries(thisInode, inodeNum);
     if (thisInode->i_block[12] != 0)
       printIndirectBlock(thisInode, inodeNum, 1, 12);
+    if (thisInode->i_block[13] != 0)
+      printIndirectBlock(thisInode, inodeNum, 2, 13);
+    if (thisInode->i_block[14] != 0)
+      printIndirectBlock(thisInode, inodeNum, 3, 14);
 }
 
 void printInodeSummaries(struct ext2_inode* inodes, int* isInodeUsed)    {
