@@ -1,3 +1,6 @@
+#NAME: Nikhil Bhatia, Chaoran Lin
+#EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
+#ID: 104132751, 004674598
 
 CC=gcc
 CFLAGS=-lm -o

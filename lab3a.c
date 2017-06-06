@@ -1,3 +1,7 @@
+//NAME: Nikhil Bhatia, Chaoran Lin
+//EMAIL: nbhatia823@ucla.edu, linmc@ucla.edu
+//ID: 104132751, 004674598
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -10,10 +14,9 @@
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
-
 #include "ext2_fs.h"
 
-#define BUF_SIZE 1024
+unsigned int BUF_SIZE = 1024;
 
 struct ext2_super_block * superBlock;
 struct ext2_group_desc * groupBlock;
@@ -48,6 +51,7 @@ void printSuperblock()
   long long unsigned int inodesCount = (long long unsigned int) superBlock->s_inodes_count;
   long long unsigned int blockSize_1 = (long long unsigned int) superBlock->s_log_block_size;
   long long unsigned int blockSize = EXT2_MIN_BLOCK_SIZE << blockSize_1;
+  BUF_SIZE = (unsigned int) blockSize;
   long long unsigned int inodeSize = (long long unsigned int) superBlock->s_inode_size;
   long long unsigned int blocksPerGroup = (long long unsigned int) superBlock->s_blocks_per_group;
   long long unsigned int inodesPerGroup = (long long unsigned int) superBlock->s_inodes_per_group;
@@ -327,9 +331,10 @@ main (int argc, char **argv)
     error("Error reading superblock");
 
   printSuperblock();
-
+  
   //Read in groupblock and print info
-  blockToRead = 2;
+  if(BUF_SIZE <= 1024)
+    blockToRead ++;
   
   groupBlock = (struct ext2_group_desc *) malloc (BUF_SIZE);
   if (pread(fd, groupBlock, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
@@ -337,7 +342,7 @@ main (int argc, char **argv)
   printGroupBlock();
 
   //Read in blockbitmap and print free
-  blockToRead = 3;    
+  blockToRead ++;    
     
   blockBitmap = malloc (BUF_SIZE);
   if (pread(fd, blockBitmap, BUF_SIZE, BUF_SIZE*blockToRead) == -1)
@@ -348,7 +353,7 @@ main (int argc, char **argv)
   int isInodeUsed[numberOfInodes];
   memset(isInodeUsed, 0, sizeof(isInodeUsed));
     
-  blockToRead = 4;
+  blockToRead ++;
 
     //Pread in inodebitmap and print free while setting used as used
   inodeBitmap = malloc (BUF_SIZE);
@@ -357,7 +362,7 @@ main (int argc, char **argv)
     
   printFreeInodes(isInodeUsed);
 
-  blockToRead = 5;
+  blockToRead ++;
   
   //Prepare to print inodeSummaries and then print
   unsigned int inodesPerBlock = BUF_SIZE/sizeof(struct ext2_inode);
